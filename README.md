@@ -63,7 +63,7 @@ Optional:
 - n8n Community nodes installation [https://docs.n8n.io/integrations/community-nodes/installation][https://docs.n8n.io/integrations/community-nodes/installation]
 - Official API Documentation [https://docs.trugen.ai](https://docs.trugen.ai)
 - Webhook and callbacks integrations [https://docs.trugen.ai/docs/agents/callback](https://docs.trugen.ai/docs/agents/callback)
-
+- Automted NPN package deployment workflow.
 
 
 ---
