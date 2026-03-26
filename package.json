@@ -1,7 +1,7 @@
 {
 	"name": "n8n-nodes-trugen",
-	"version": "0.1.10",
-	"description": "n8n community node to interact with TruGen.AI Agentic Playform.",
+	"version": "0.1.11",
+	"description": "n8n community node to interact with TruGen.AI Agentic Platform.",
 	"license": "MIT",
 	"homepage": "https://trugen.ai",
 	"keywords": [
@@ -36,7 +36,7 @@
 			"dist/credentials/TrugenApi.credentials.js"
 		],
 		"nodes": [
-			"dist/nodes/Trugen/Trugen.node.js"
+			"dist/nodes/trugen/Trugen.node.js"
 		]
 	},
 	"devDependencies": {

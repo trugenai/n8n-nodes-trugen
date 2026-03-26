@@ -9,7 +9,7 @@ export class TrugenApi implements ICredentialType {
 	name = 'trugenApi';
 	displayName = 'TruGen.AI API';
 	documentationUrl = 'https://docs.trugen.ai';
-	icon = 'file:../icons/trugen.svg' as const;
+	icon = 'file:trugen.svg' as const;
 	properties: INodeProperties[] = [
 		{
 			displayName: 'API Key',

@@ -3,7 +3,7 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
-	NodeConnectionType,
+	NodeConnectionTypes,
 	IDataObject,
 	JsonObject,
 	NodeApiError,
@@ -52,21 +52,22 @@ export class Trugen implements INodeType {
 		version: 1,
 		usableAsTool: true,
 		description: 'Create agents, list avatars, and fetch conversations from Trugen',
+		subtitle: '={{$parameter["operation"]}}',
 		defaults: { name: 'TruGen' },
-		inputs: <NodeConnectionType[]>['main'],
-		outputs: <NodeConnectionType[]>['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [{ name: 'trugenApi', required: true }],
 
 		properties: [
 			{
-				displayName: 'Action',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				noDataExpression: true,
 				options: [
 					{ name: 'Create Agent', value: 'createAgent' },
-					{ name: 'Get Stock Avatars', value: 'getAvatars' },
 					{ name: 'Get Conversation', value: 'getConversation' },
+					{ name: 'Get Stock Avatars', value: 'getAvatars' },
 				],
 				default: 'createAgent',
 			},
@@ -370,13 +371,21 @@ export class Trugen implements INodeType {
 				default: false,
 				displayOptions: { show: { operation: ['getConversation'] } },
 			},
+			{
+				displayName: 'Poll Timeout (Seconds)',
+				name: 'poll_timeout',
+				type: 'number',
+				default: 60,
+				typeOptions: { minValue: 1 },
+				displayOptions: { show: { operation: ['getConversation'], wait_for_completion: [true] } },
+				description: 'Maximum seconds to wait for conversation completion before returning with timed_out: true',
+			},
 		],
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const operation = this.getNodeParameter('operation', 0) as string;
-		const credentials = await this.getCredentials('trugenApi');
 
 		const results: INodeExecutionData[] = [];
 
@@ -444,20 +453,18 @@ export class Trugen implements INodeType {
 						},
 					};
 
-					response = await this.helpers.httpRequest({
+					response = await this.helpers.httpRequestWithAuthentication.call(this, 'trugenApi', {
 						method: 'POST',
 						url: 'https://api.trugen.ai/v1/ext/agent',
-						headers: { 'x-api-key': credentials.apiKey as string },
 						body,
 						json: true,
 					});
 				}
 
 				if (operation === 'getAvatars') {
-					response = await this.helpers.httpRequest({
+					response = await this.helpers.httpRequestWithAuthentication.call(this, 'trugenApi', {
 						method: 'GET',
 						url: 'https://api.trugen.ai/v1/ext/avatars',
-						headers: { 'x-api-key': credentials.apiKey as string },
 						json: true,
 					});
 				}
@@ -467,10 +474,9 @@ export class Trugen implements INodeType {
 					const wait = this.getNodeParameter('wait_for_completion', i, false) as boolean;
 
 					const fetch = async () => {
-						return await this.helpers.httpRequest({
+						return await this.helpers.httpRequestWithAuthentication.call(this, 'trugenApi', {
 							method: 'GET',
 							url: `https://api.trugen.ai/v1/ext/conversation/${conversationId}`,
-							headers: { 'x-api-key': credentials.apiKey as string },
 							json: true,
 						});
 					};
@@ -478,11 +484,14 @@ export class Trugen implements INodeType {
 					response = await fetch();
 
 					if (wait) {
-						let retries = 0;
-						while ((response as IDataObject).status !== 'Completed' && retries < 5) {
+						const pollTimeout = this.getNodeParameter('poll_timeout', i, 60) as number;
+						const deadline = Date.now() + pollTimeout * 1000;
+						while ((response as IDataObject).status !== 'Completed' && Date.now() < deadline) {
 							await sleep(2000);
 							response = await fetch();
-							retries++;
+						}
+						if ((response as IDataObject).status !== 'Completed') {
+							(response as IDataObject).timed_out = true;
 						}
 					}
 				}
@@ -494,9 +503,7 @@ export class Trugen implements INodeType {
 			} catch (error) {
 				if (this.continueOnFail()) {
 					results.push({
-						json: {
-							error: (error as Error).message,
-						},
+						json: { error: new NodeApiError(this.getNode(), error as JsonObject).message },
 						pairedItem: { item: i },
 					});
 					continue;
