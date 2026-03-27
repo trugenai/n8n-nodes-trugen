@@ -163,16 +163,12 @@ export class Trugen implements INodeType {
 				name: 'llmModel_groq',
 				type: 'options',
 				options: [
+					{ name: 'GPT OSS 20b', value: 'openai/gpt-oss-20b' },
+					{ name: 'GPT OSS 120b', value: 'openai/gpt-oss-120b' },
 					{
 						name: 'Llama-4 Maverick',
 						value: 'meta-llama/llama-4-maverick-17b-128e-instruct',
 					},
-					{
-						name: 'Llama-4 Scout',
-						value: 'meta-llama/llama-4-scout-17b-16e-instruct',
-					},
-					{ name: 'GPT OSS 20b', value: 'openai/gpt-oss-20b' },
-					{ name: 'GPT OSS 120b', value: 'openai/gpt-oss-120b' },
 				],
 				default: 'meta-llama/llama-4-maverick-17b-128e-instruct',
 				displayOptions: {
@@ -251,9 +247,9 @@ export class Trugen implements INodeType {
 				name: 'sttModel',
 				type: 'options',
 				options: [
-					{ name: 'Nova 3', value: 'nova-3' },
-					{ name: 'Nova 2', value: 'nova-2' },
 					{ name: 'Flux General English', value: 'flux-general-en' },
+					{ name: 'Nova 2', value: 'nova-2' },
+					{ name: 'Nova 3', value: 'nova-3' },
 				],
 				default: 'nova-3',
 				displayOptions: { show: { operation: ['createAgent'] } },
@@ -314,17 +310,6 @@ export class Trugen implements INodeType {
 				displayOptions: { show: { operation: ['createAgent'] } },
 			},
 			{
-				displayName: 'Capabilities',
-				name: 'capabilities',
-				type: 'multiOptions',
-				options: [
-					{ name: 'Webcam Vision', value: 'webcam_vision' },
-					{ name: 'Screen Vision', value: 'screen_vision' },
-				],
-				default: [],
-				displayOptions: { show: { operation: ['createAgent'] } },
-			},
-			{
 				displayName: 'Record Calls',
 				name: 'record',
 				type: 'boolean',
@@ -378,7 +363,8 @@ export class Trugen implements INodeType {
 				default: 60,
 				typeOptions: { minValue: 1 },
 				displayOptions: { show: { operation: ['getConversation'], wait_for_completion: [true] } },
-				description: 'Maximum seconds to wait for conversation completion before returning with timed_out: true',
+				description:
+					'Maximum seconds to wait for conversation completion before returning with timed_out: true',
 			},
 		],
 	};
@@ -473,7 +459,7 @@ export class Trugen implements INodeType {
 					const conversationId = this.getNodeParameter('conversation_id', i) as string;
 					const wait = this.getNodeParameter('wait_for_completion', i, false) as boolean;
 
-					const fetch = async () => {
+					const fetchConversation = async () => {
 						return await this.helpers.httpRequestWithAuthentication.call(this, 'trugenApi', {
 							method: 'GET',
 							url: `https://api.trugen.ai/v1/ext/conversation/${conversationId}`,
@@ -481,14 +467,14 @@ export class Trugen implements INodeType {
 						});
 					};
 
-					response = await fetch();
+					response = await fetchConversation();
 
 					if (wait) {
 						const pollTimeout = this.getNodeParameter('poll_timeout', i, 60) as number;
 						const deadline = Date.now() + pollTimeout * 1000;
 						while ((response as IDataObject).status !== 'Completed' && Date.now() < deadline) {
 							await sleep(2000);
-							response = await fetch();
+							response = await fetchConversation();
 						}
 						if ((response as IDataObject).status !== 'Completed') {
 							(response as IDataObject).timed_out = true;
@@ -503,7 +489,7 @@ export class Trugen implements INodeType {
 			} catch (error) {
 				if (this.continueOnFail()) {
 					results.push({
-						json: { error: new NodeApiError(this.getNode(), error as JsonObject).message },
+						json: { error: (error as Error).message },
 						pairedItem: { item: i },
 					});
 					continue;
